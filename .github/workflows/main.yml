@@ -60,10 +60,33 @@ jobs:
       - name: npm audit (High+)
         run: npm run audit
 
+      - name: Debug SNYK_TOKEN (safe)
+        shell: bash
+        env:
+          SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
+        run: |
+          if [ -z "$SNYK_TOKEN" ]; then
+            echo "SNYK_TOKEN is empty. Add it as a GitHub Secret: Settings → Secrets and variables → Actions → Secrets." >&2
+            exit 1
+          fi
+
+          # Detect accidental whitespace/newlines
+          trimmed="$(printf '%s' "$SNYK_TOKEN" | tr -d '\r\n' | sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//')"
+          if [ "$trimmed" != "$(printf '%s' "$SNYK_TOKEN")" ]; then
+            echo "SNYK_TOKEN contains leading/trailing whitespace or newlines. Re-save it without spaces/newlines." >&2
+            exit 1
+          fi
+
+          len=${#SNYK_TOKEN}
+          prefix=${SNYK_TOKEN:0:2}
+          suffix=${SNYK_TOKEN: -2}
+          echo "SNYK_TOKEN present (value hidden): length=$len prefix=${prefix}** suffix=**${suffix}"
+          printf '%s' "$SNYK_TOKEN" | sha256sum | awk '{print "SNYK_TOKEN sha256=" $1}'
+
       - name: Snyk Open Source (SCA) - dependencies (High+)
         uses: snyk/actions/node@master
         env:
-          SNYK_TOKEN: ${{ vars.SNYK_TOKEN }}
+          SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
         with:
           command: test
           args: >-
@@ -73,7 +96,7 @@ jobs:
       - name: Snyk Code (SAST) - source code (High+)
         uses: snyk/actions/node@master
         env:
-          SNYK_TOKEN: ${{ vars.SNYK_TOKEN }}
+          SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
         with:
           command: code
           args: >-
@@ -123,10 +146,24 @@ jobs:
           tags: ${{ steps.meta.outputs.image }}
           provenance: false
 
+      - name: Debug SNYK_TOKEN (safe)
+        shell: bash
+        env:
+          SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
+        run: |
+          if [ -z "$SNYK_TOKEN" ]; then
+            echo "SNYK_TOKEN is empty. Add it as a GitHub Secret: Settings → Secrets and variables → Actions → Secrets." >&2
+            exit 1
+          fi
+          len=${#SNYK_TOKEN}
+          prefix=${SNYK_TOKEN:0:2}
+          suffix=${SNYK_TOKEN: -2}
+          echo "SNYK_TOKEN present (value hidden): length=$len prefix=${prefix}** suffix=**${suffix}"
+
       - name: Snyk Container - image scan (High+)
         uses: snyk/actions/docker@master
         env:
-          SNYK_TOKEN: ${{ vars.SNYK_TOKEN }}
+          SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
         with:
           image: ${{ steps.meta.outputs.image }}
           args: >-
@@ -166,10 +203,10 @@ jobs:
       - name: Configure kubeconfig
         shell: bash
         env:
-          KUBECONFIG_B64: ${{ vars.KUBECONFIG_B64 }}
+          KUBECONFIG_B64: ${{ secrets.KUBECONFIG_B64 }}
         run: |
           if [ -z "$KUBECONFIG_B64" ]; then
-            echo "KUBECONFIG_B64 is missing (set it as an Actions Variable)" >&2
+            echo "KUBECONFIG_B64 secret is missing. Add it in Settings → Secrets and variables → Actions → Secrets." >&2
             exit 1
           fi
           mkdir -p "$HOME/.kube"

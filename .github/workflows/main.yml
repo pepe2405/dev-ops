@@ -123,20 +123,6 @@ jobs:
           tags: ${{ steps.meta.outputs.image }}
           provenance: false
 
-      - name: Debug SNYK_TOKEN (safe)
-        shell: bash
-        env:
-          SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
-        run: |
-          if [ -z "$SNYK_TOKEN" ]; then
-            echo "SNYK_TOKEN is empty. Add it as a GitHub Secret: Settings → Secrets and variables → Actions → Secrets." >&2
-            exit 1
-          fi
-          len=${#SNYK_TOKEN}
-          prefix=${SNYK_TOKEN:0:2}
-          suffix=${SNYK_TOKEN: -2}
-          echo "SNYK_TOKEN present (value hidden): length=$len prefix=${prefix}** suffix=**${suffix}"
-
       - name: Snyk Container - image scan (High+)
         uses: snyk/actions/docker@master
         env:

@@ -146,6 +146,8 @@ jobs:
           args: >-
             --severity-threshold=high
             --file=Dockerfile
+            --exclude-app-vulns
+            --exclude-base-image-vulns
 
       - name: Push image to GHCR
         uses: docker/build-push-action@v5

@@ -1,0 +1,15 @@
+# Snyk policy file
+# This file is intentionally committed so security exceptions are reviewable.
+# Add ignores only when you have a business justification and an expiry.
+
+version: v1.25.0
+
+# example ignore format (leave empty by default):
+# ignore:
+#   SNYK-JS-FOO-123456:
+#     - '*':
+#         reason: "False positive in this repo because ..."
+#         expires: 2026-12-31
+
+patch: {}
+

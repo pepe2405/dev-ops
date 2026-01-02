@@ -1,0 +1,188 @@
+name: CI-CD
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+env:
+  NODE_VERSION: '20'
+  APP_NAME: dev-ops-playground
+  CONTAINER_PORT: '3000'
+  REGISTRY: ghcr.io
+
+jobs:
+  quality:
+    name: Quality gates (lint + unit tests)
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+
+      - name: Install dependencies (reproducible)
+        run: npm ci
+
+      - name: ESLint
+        run: npm run lint
+
+      - name: Unit tests
+        run: npm test
+
+  security:
+    name: Security (SAST + SCA)
+    runs-on: ubuntu-latest
+    needs: [quality]
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+
+      - name: Install dependencies (reproducible)
+        run: npm ci
+
+      - name: npm audit (High+)
+        run: npm run audit
+
+      - name: Snyk Open Source (SCA) - dependencies (High+)
+        uses: snyk/actions/node@master
+        env:
+          SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
+        with:
+          command: test
+          args: >-
+            --severity-threshold=high
+            --fail-on=all
+
+      - name: Snyk Code (SAST) - source code (High+)
+        uses: snyk/actions/node@master
+        env:
+          SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
+        with:
+          command: code
+          args: >-
+            test
+            --severity-threshold=high
+
+  container:
+    name: Container (build + scan + push)
+    runs-on: ubuntu-latest
+    needs: [security]
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+
+    permissions:
+      contents: read
+      packages: write
+
+    outputs:
+      image: ${{ steps.meta.outputs.image }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set image name
+        id: meta
+        shell: bash
+        run: |
+          IMAGE="${REGISTRY}/${GITHUB_REPOSITORY}/${APP_NAME}:${GITHUB_SHA}"
+          echo "image=$IMAGE" >> "$GITHUB_OUTPUT"
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Login to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build image (local)
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: Dockerfile
+          load: true
+          tags: ${{ steps.meta.outputs.image }}
+          provenance: false
+
+      - name: Snyk Container - image scan (High+)
+        uses: snyk/actions/docker@master
+        env:
+          SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
+        with:
+          image: ${{ steps.meta.outputs.image }}
+          args: >-
+            --severity-threshold=high
+            --file=Dockerfile
+
+      - name: Push image to GHCR
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: Dockerfile
+          push: true
+          tags: ${{ steps.meta.outputs.image }}
+          provenance: false
+
+  deploy:
+    name: Deploy to Kubernetes
+    runs-on: ubuntu-latest
+    needs: [container]
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+
+    permissions:
+      contents: read
+
+    environment:
+      name: production
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install kubectl
+        uses: azure/setup-kubectl@v4
+        with:
+          version: 'latest'
+
+      - name: Configure kubeconfig
+        shell: bash
+        env:
+          KUBECONFIG_B64: ${{ secrets.KUBECONFIG_B64 }}
+        run: |
+          if [ -z "$KUBECONFIG_B64" ]; then
+            echo "KUBECONFIG_B64 secret is missing" >&2
+            exit 1
+          fi
+          mkdir -p "$HOME/.kube"
+          echo "$KUBECONFIG_B64" | base64 -d > "$HOME/.kube/config"
+          chmod 600 "$HOME/.kube/config"
+
+      - name: Deploy manifests
+        run: kubectl apply -f k8s/
+
+      - name: Update image and wait for rollout
+        shell: bash
+        env:
+          IMAGE: ${{ needs.container.outputs.image }}
+        run: |
+          kubectl set image deployment/${APP_NAME} ${APP_NAME}=${IMAGE}
+          kubectl rollout status deployment/${APP_NAME} --timeout=120s

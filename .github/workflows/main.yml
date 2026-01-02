@@ -179,18 +179,19 @@ jobs:
         with:
           version: 'latest'
 
-      - name: Configure kubeconfig
+      - name: Install k3d
         shell: bash
-        env:
-          KUBECONFIG_B64: ${{ secrets.KUBECONFIG_B64 }}
         run: |
-          if [ -z "$KUBECONFIG_B64" ]; then
-            echo "KUBECONFIG_B64 secret is missing. Add it in Settings → Secrets and variables → Actions → Secrets." >&2
-            exit 1
-          fi
-          mkdir -p "$HOME/.kube"
-          echo "$KUBECONFIG_B64" | base64 -d > "$HOME/.kube/config"
-          chmod 600 "$HOME/.kube/config"
+          curl -s https://raw.githubusercontent.com/k3d-io/k3d/main/install.sh | bash
+          k3d version
+
+      - name: Create k3d cluster
+        shell: bash
+        run: |
+          k3d cluster create ci-cluster \
+            --wait \
+            --k3s-arg "--disable=traefik@server:*"
+          kubectl cluster-info
 
       - name: Deploy manifests
         run: kubectl apply -f k8s/
@@ -201,4 +202,9 @@ jobs:
           IMAGE: ${{ needs.container.outputs.image }}
         run: |
           kubectl set image deployment/${APP_NAME} ${APP_NAME}=${IMAGE}
-          kubectl rollout status deployment/${APP_NAME} --timeout=120s
+          kubectl rollout status deployment/${APP_NAME} --timeout=180s
+
+      - name: Tear down k3d cluster
+        if: always()
+        shell: bash
+        run: k3d cluster delete ci-cluster

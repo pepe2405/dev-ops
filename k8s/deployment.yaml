@@ -1,21 +1,21 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: my-app
+  name: dev-ops-playground
   labels:
-    app: my-app
+    app: dev-ops-playground
 spec:
   replicas: 1
   selector:
     matchLabels:
-      app: my-app
+      app: dev-ops-playground
   template:
     metadata:
       labels:
-        app: my-app
+        app: dev-ops-playground
     spec:
       containers:
-        - name: my-app
+        - name: dev-ops-playground
           image: ghcr.io/<owner>/<repo>/my-app:latest
           imagePullPolicy: IfNotPresent
           ports:

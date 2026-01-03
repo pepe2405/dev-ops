@@ -39,8 +39,33 @@ jobs:
       - name: Unit tests
         run: npm test
 
+  codeql:
+    name: CodeQL (SAST)
+    runs-on: ubuntu-latest
+    needs: [quality]
+
+    permissions:
+      actions: read
+      contents: read
+      security-events: write
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Initialize CodeQL
+        uses: github/codeql-action/init@v3
+        with:
+          languages: javascript-typescript
+
+      - name: Autobuild
+        uses: github/codeql-action/autobuild@v3
+
+      - name: Perform CodeQL Analysis
+        uses: github/codeql-action/analyze@v3
+
   security:
-    name: Security (SAST + SCA)
+    name: Security (Snyk SAST + SCA)
     runs-on: ubuntu-latest
     needs: [quality]
 
@@ -83,7 +108,7 @@ jobs:
   container:
     name: Container (build + scan + push)
     runs-on: ubuntu-latest
-    needs: [security]
+    needs: [security, codeql]
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
 
     permissions:

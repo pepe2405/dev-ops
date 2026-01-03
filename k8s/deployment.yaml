@@ -16,7 +16,7 @@ spec:
     spec:
       containers:
         - name: dev-ops-playground
-          image: ghcr.io/<owner>/<repo>/my-app:latest
+          image: ghcr.io/<owner>/<repo>/dev-ops-playground:latest
           imagePullPolicy: IfNotPresent
           ports:
             - containerPort: 3000
@@ -46,6 +46,8 @@ spec:
             allowPrivilegeEscalation: false
             readOnlyRootFilesystem: true
             runAsNonRoot: true
+            runAsUser: 10001
+            runAsGroup: 10001
             capabilities:
               drop: ["ALL"]
           volumeMounts:

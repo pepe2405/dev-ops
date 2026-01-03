@@ -9,7 +9,7 @@ app.get('/healthz', (_req, res) => {
 
 // Example endpoint (kept intentionally simple)
 app.get('/', (_req, res) => {
-  res.type('text/plain').send('secure-ci-cd-pipeline-demo');
+  res.type('text/plain').send('dev-ops-playground');
 });
 
 export function createServer() {

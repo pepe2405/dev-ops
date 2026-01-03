@@ -1,8 +1,8 @@
 {
-  "name": "secure-ci-cd-pipeline-demo",
+  "name": "dev-ops-playground",
   "version": "1.0.0",
   "private": true,
-  "description": "Demo Node.js app + secure CI/CD pipeline with GitHub Actions & Snyk",
+  "description": "Demo Node.js app + secure CI/CD pipeline with GitHub Actions, Snyk, CodeQL, Docker, and Kubernetes",
   "type": "module",
   "license": "MIT",
   "repository": {
@@ -24,7 +24,7 @@
     "audit": "npm audit --audit-level=high",
     "snyk:oss": "snyk test --severity-threshold=high",
     "snyk:code": "snyk code test --severity-threshold=high",
-    "snyk:container": "snyk container test secure-ci-cd-pipeline-demo:local --severity-threshold=high --file=Dockerfile"
+    "snyk:container": "snyk container test dev-ops-playground:local --severity-threshold=high --file=Dockerfile"
   },
   "dependencies": {
     "express": "^4.20.0"

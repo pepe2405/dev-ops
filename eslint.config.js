@@ -1,19 +1,19 @@
-import js from '@eslint/js';
-import globals from 'globals';
-import security from 'eslint-plugin-security';
-import n from 'eslint-plugin-n';
-import promise from 'eslint-plugin-promise';
+import js from "@eslint/js";
+import globals from "globals";
+import security from "eslint-plugin-security";
+import n from "eslint-plugin-n";
+import promise from "eslint-plugin-promise";
 
 export default [
   js.configs.recommended,
   {
-    ignores: ['node_modules/**', 'dist/**', 'coverage/**'],
+    ignores: ["node_modules/**", "dist/**", "coverage/**"],
   },
   {
-    files: ['**/*.js'],
+    files: ["**/*.js"],
     languageOptions: {
-      ecmaVersion: 'latest',
-      sourceType: 'module',
+      ecmaVersion: "latest",
+      sourceType: "module",
       globals: {
         ...globals.node,
       },
@@ -24,16 +24,10 @@ export default [
       promise,
     },
     rules: {
-      // Helpful defaults for Node projects
-      'n/no-missing-import': 'off',
-      'n/no-unsupported-features/es-syntax': 'off',
-
-      // Security signals
-      'security/detect-object-injection': 'warn',
-
-      // Keep CI noise predictable
-      'no-unused-vars': ['error', { argsIgnorePattern: '^_' }],
+      "n/no-missing-import": "off",
+      "n/no-unsupported-features/es-syntax": "off",
+      "security/detect-object-injection": "warn",
+      "no-unused-vars": ["error", { argsIgnorePattern: "^_" }],
     },
   },
 ];
-

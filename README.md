@@ -1,6 +1,4 @@
-# Secure CI/CD Pipeline Demo (GitHub Actions + Snyk)
-
-Това репо е малка, но **production-style** Node.js услуга, която демонстрира реалистичен DevSecOps pipeline с GitHub Actions + Snyk:
+# DevOps Playground: Secure CI/CD (GitHub Actions + Snyk + CodeQL + Docker + Kubernetes)
 
 - **Quality gates**: ESLint + unit tests
 - **SAST**: Snyk Code (анализ на нашия код)
@@ -8,7 +6,16 @@
 - **Container security**: Snyk Container (уязвимости в Docker image-а)
 - **CD**: build + push към GHCR и deploy към Kubernetes чрез `kubectl`
 
-## Услугата накратко
+## Vertical deep dive: Security на няколко слоя (multi-level)
+
+За да е **вертикално на повече нива**, security е разгърнат на слоеве:
+
+- **Code level (SAST)**: Snyk Code + CodeQL
+- **Dependencies (SCA)**: Snyk Open Source + `npm audit`
+- **Container level**: build + scan на Docker image
+- **Runtime/IaC level (Kubernetes hardening)**: securityContext, seccomp, non-root, read-only FS
+
+## Приложението накратко
 
 - Runtime: Node.js 20
 - Framework: Express
@@ -18,8 +25,6 @@
 
 ```powershell
 npm ci
-npm run lint
-npm test
 npm start
 ```
 
@@ -29,87 +34,88 @@ npm start
 
 Файл: `.github/workflows/main.yml`
 
-Pipeline-ът е структуриран на отделни job-ове, за да има ясни quality/security gates и да е лесен за дебъг.
+Pipeline-ът е структуриран на отделни job-ове
 
 ### Job 1: `quality` (PR + main)
 
-**Цел:** спираме проблеми в кода възможно най-рано.
+**Цел:** спираме проблеми при build-ването в кода възможно най-рано.
 
 Стъпки:
 
-- `npm ci` (винаги от lockfile)
+- `npm ci`
 - `npm run lint`
-- `npm test` (Node built-in test runner)
+- `npm test`
 
-Ако тук не е зелено, security/container/deploy изобщо не тръгват.
+### Job 2: `codeql` (SAST) (PR + main)
 
-### Job 2: `security` (PR + main)
-
-**Цел:** “shift-left” security проверки на PR-и и на main.
+**Цел:** допълнителен SAST слой чрез CodeQL.
 
 Стъпки:
 
-1) `npm run audit` с `--audit-level=high` (бърз сигнал от npm advisory DB)
+- Initialize CodeQL (JavaScript/TypeScript)
+- Autobuild
+- Analyze
 
-2) **Snyk Open Source (SCA)**
+### Job 3: `security` (PR + main)
 
-- сканира `package-lock.json` за CVE-та и уязвими версии
+**Цел:** Security проверки на PR-и и на main.
+
+Стъпки:
+
+1. `npm run audit` с `--audit-level=high`
+
+2. **Snyk Open Source (SCA)**
+
+- сканира `package-lock.json` за уязвими версии
 - gate: pipeline fail при **High/Critical** (`--severity-threshold=high`)
 
-3) **Snyk Code (SAST)**
+3. **Snyk Code (SAST)**
 
-- сканира `src/` за уязвими модели/потоци (инжекции, небезопасни операции, hardcoded secrets и др.)
+- сканира `src/` за уязвимости
 - gate: fail при **High/Critical** (`--severity-threshold=high`)
 
-#### Deep dive (SAST vs SCA) – в контекста на това репо
+#### Deep dive (SAST vs SCA)
 
-- **SAST (Snyk Code)**: гледа *нашата логика* — как използваме входа/изхода, как строим заявки, как обработваме данни. Проблемите са в `src/`.
-- **SCA (Snyk Open Source)**: гледа *чуждия код* — зависимостите, които доставяме. Проблемите са в `package.json`/`package-lock.json`.
+- **SAST (Snyk Code)**: Проблемите са в `src/`.
+- **SCA (Snyk Open Source)**: Проблемите са в `package.json`/`package-lock.json`.
 
-#### Политика за “fail” (реалистична и управляема)
-
-За да няма шум и да не блокира development-а за ниско-рискови находки, pipeline-ът е конфигуриран да спира само при **High/Critical**.
+Pipeline-ът е конфигуриран да спира само при **High/Critical**.
 
 Файлът `.snyk` е в репото, за да може всеки “ignore” да е:
 
-- reviewable (Code Review)
 - с причина
 - с крайна дата (expiry)
 
-### Job 3: `container` (само `main` при push)
+### Job 4: `container` (само `main` при push)
 
 **Цел:** build + security scan на image-а преди да го качим.
 
 Стъпки:
 
-- Build на Docker image-а от `Dockerfile` (multi-stage, non-root runtime)
+- Build на Docker image-а от `Dockerfile`
 - **Snyk Container** scan на построения image (High+)
-- Push към GitHub Container Registry (GHCR)
 
-Име на image-а, което pipeline-ът използва:
-
-- `ghcr.io/<owner>/<repo>/my-app:<git-sha>`
-
-### Job 4: `deploy` (само `main` при push)
+### Job 5: `deploy` (само `main` при push)
 
 **Цел:** автоматичен deployment към Kubernetes.
 
 Стъпки:
 
 - `kubectl apply -f k8s/`
-- `kubectl set image deployment/my-app my-app=<image-from-container-job>`
-- `kubectl rollout status` (чака rollout-а да завърши)
+- `kubectl set image deployment/dev-ops-playground dev-ops-playground=<image-from-container-job>`
+- `kubectl rollout status`
 
-`k8s/deployment.yaml` е hardened (non-root, read-only filesystem, drop capabilities, seccomp).
+#### Какъв Kubernetes използва deploy job-ът?
 
-## Secrets (GitHub repository secrets)
+За да е **напълно автоматизиран** и да не зависи от външен клъстър, deploy job-ът създава **временен Kubernetes** в GitHub Actions runner чрез **k3d** (k3s-in-Docker), deploy-ва manifest-ите и чака rollout.
 
-Това са реалните секрети, които workflow-ът очаква:
+## GitHub Actions Secrets
+
+Pipeline-ът очаква следните **GitHub Actions Secrets**:
 
 - `SNYK_TOKEN` – Snyk API token (нужен за SAST/SCA/Container)
-- `KUBECONFIG_B64` – base64-нат kubeconfig за deploy job-а
 
-> Забележка: за push към GHCR се използва вградения `GITHUB_TOKEN` с `packages: write` permission.
+За push към GHCR се използва вградения `GITHUB_TOKEN` (автоматично генериран от GitHub) с `packages: write` permission.
 
 ## Как да валидираш локално, че ще мине CI
 
@@ -119,5 +125,3 @@ npm run lint
 npm test
 npm run audit
 ```
-
-Snyk командите могат да се пуснат локално само ако имаш Snyk CLI и `SNYK_TOKEN`.

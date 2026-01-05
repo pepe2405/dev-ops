@@ -1,11 +1,6 @@
 {
   "severityThreshold": "high",
   "exclude": {
-    "folders": [
-      "node_modules",
-      "dist",
-      "coverage"
-    ]
+    "folders": ["node_modules", "dist", "coverage"]
   }
 }
-

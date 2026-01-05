@@ -20,6 +20,8 @@
     "start": "node src/server.js",
     "dev": "node src/server.js",
     "lint": "eslint .",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
     "test": "node --test",
     "audit": "npm audit --audit-level=high",
     "snyk:oss": "snyk test --severity-threshold=high",
@@ -36,6 +38,7 @@
     "eslint-plugin-promise": "^7.2.1",
     "eslint-plugin-security": "^3.0.1",
     "globals": "^15.14.0",
+    "prettier": "^3.7.4",
     "supertest": "^6.3.4"
   }
 }

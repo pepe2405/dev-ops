@@ -16,7 +16,7 @@ spec:
     spec:
       containers:
         - name: dev-ops-playground
-          image: ghcr.io/<owner>/<repo>/dev-ops-playground:latest
+          image: dev-ops-playground:placeholder
           imagePullPolicy: IfNotPresent
           ports:
             - containerPort: 3000
